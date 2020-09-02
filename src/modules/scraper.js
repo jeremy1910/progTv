@@ -1,6 +1,7 @@
 const cheerio = require('cheerio')
 const axios = require('axios')
-
+const db = require('monk')('localhost/progTv')
+const dbChannels = db.get('channels')
 
 const baseURL = process.env.URL_SCRAPING_BASE
 
@@ -22,14 +23,14 @@ const getSynopsis = async (link) => {
 }
 
 
-const parsePage = (data) => {
+const parsePage = async (data) => {
     const schedules = []
 
     const $ = cheerio.load(data)
-    const canals = $('div.bouquet-epgGrid').find('div.doubleBroadcastCard')
+    const canals = $('div.bouquet-epgGrid').find('div.doubleBroadcastCard').toArray()
+    console.log(canals.length)
 
-
-     canals.each( async (index, canal) => {
+     await Promise.all(canals.map( async (canal) => {
         const heure = $(canal).find('.doubleBroadcastCard-hour')
         const nom =  $(canal).find('.doubleBroadcastCard-title')
         const channel = $(canal).find('.doubleBroadcastCard-channelName')
@@ -57,17 +58,46 @@ const parsePage = (data) => {
 
 
 
-    })
+    }))
     return schedules
 }
 
 
+const persistInDb = async (channel, day) => {
+    const newSchedule = {
+        day: new Date(day),
+        schedule: channel.channelSchedule
+    }
+
+    const foundedChannel = await dbChannels.findOne({channel: channel.channel})
+    if(foundedChannel) {
+        console.log(`chaine ${channel.channel} Trouvé`)
+        if(!foundedChannel.schedules.find( schedule => new Date(schedule.day).toDateString() === new Date(day).toDateString())){
+            console.log(`chaine ${channel.channel}, jour ${day} n'existe pas`)
+            foundedChannel.schedules.push(newSchedule)
+            dbChannels.update({_id: foundedChannel._id}, {$set: {schedules: foundedChannel.schedules}})
+        }
+    } else {
+        console.log(`chaine ${channel.channel} non trouvé`)
+        dbChannels.insert({
+            channel: channel.channel,
+            schedules: [
+                newSchedule
+            ]
+        })
+    }
+    console.log(`chaine ${channel.channel} writted`)
+    return null
+}
+
 const getProg = async (day) => {
     const data = await getPage(day)
     if(data) {
-        const schedules =  parsePage(data)
-        console.log(schedules)
+        const channels = await parsePage(data)
+        console.log('nombre de chaines : ', channels.length)
+        await Promise.all(channels.map(async (channel) => await persistInDb(channel, day)))
     }
+    db.close()
 }
 
 module.exports = { getProg }

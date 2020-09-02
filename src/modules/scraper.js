@@ -14,10 +14,9 @@ const getSynopsis = async (link) => {
         const { data } = await axios.get(link)
         const $ = cheerio.load(data)
         const description = $('div.synopsis-text.defaultStyleContentTags').text().trim()
-        return description || null
+        return description || 'n/a'
     } catch (e) {
-        console.log('error', link)
-        return null
+        return 'n/a'
     }
    
 }
@@ -37,25 +36,21 @@ const parsePage = (data) => {
             await getSynopsis($(nom[0]).attr('href').trim()),
             await getSynopsis($(nom[1]).attr('href').trim())
         ]
-        const shedule = {
-            chaine: $(channel).text().trim(),
-            shedules: [
-                {
-                    heure: $(heure[0]).text().trim(),
-                    programme: $(nom[0]).text().trim(),
-                    description: descriptions[0],
-                    type: $(type[0]).text().trim(),
-                    duration: $(duration[0]).text().trim()
-                },
-                {
-                    heure: $(heure[1]).text().trim(),
-                    programme: $(nom[1]).text().trim(),
-                    description: descriptions[1],
-                    type: $(type[1]).text().trim(),
-                    duration: $(duration[1]).text().trim()                }
-            ]
+        const schedule = {
+            channel: $(channel).text().trim(),
+            channelSchedule: []
         }
-        console.log(shedule)
+
+        for(let i = 0; i < 2; i++) {
+            schedule.channelSchedule.push({
+                hour: $(heure[i]).text().trim(),
+                programme: $(nom[i]).text().trim(),
+                description: descriptions[i],
+                type: $(type[i]).text().trim(),
+                duration: $(duration[i]).text().trim()
+            })
+        }
+        console.log(schedule)
 
     })
     

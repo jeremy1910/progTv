@@ -23,10 +23,13 @@ const getSynopsis = async (link) => {
 
 
 const parsePage = (data) => {
+    const schedules = []
+
     const $ = cheerio.load(data)
     const canals = $('div.bouquet-epgGrid').find('div.doubleBroadcastCard')
-    
-    canals.each( async (index, canal) => {
+
+
+     canals.each( async (index, canal) => {
         const heure = $(canal).find('.doubleBroadcastCard-hour')
         const nom =  $(canal).find('.doubleBroadcastCard-title')
         const channel = $(canal).find('.doubleBroadcastCard-channelName')
@@ -50,17 +53,20 @@ const parsePage = (data) => {
                 duration: $(duration[i]).text().trim()
             })
         }
-        console.log(schedule)
+        schedules.push(schedule)
+
+
 
     })
-    
+    return schedules
 }
 
 
 const getProg = async (day) => {
     const data = await getPage(day)
     if(data) {
-        return parsePage(data)
+        const schedules =  parsePage(data)
+        console.log(schedules)
     }
 }
 

@@ -2,11 +2,10 @@ require('dotenv').config()
 const db = require('monk')('localhost/progTv')
 const dbChannels = db.get('channels')
 
-const { GraphQLServer } = require('graphql-yoga')
+const { GraphQLServer } = require('graphql-yoga');
 
-const { getProg } = require('./src/modules/scraper');
 
-/* getProg('2020-09-01') */
+
 
 (async () => {
     console.log(JSON.stringify(await dbChannels.find({ channel: 'TF1' }, {schedules: {schedule: {hour: 1}, day: 1} })))
@@ -18,12 +17,11 @@ const typeDefs = `
   }
 
   type Schedule {
-      day: String,
       hour: String
   }
 
   type Schedules {
-      channel: String,
+      day: String,
       schedules: [Schedule] 
   }
 

@@ -1,3 +1,4 @@
+require('dotenv').config()
 const cheerio = require('cheerio')
 const axios = require('axios')
 const db = require('monk')('localhost/progTv')
@@ -6,6 +7,7 @@ const dbChannels = db.get('channels')
 const baseURL = process.env.URL_SCRAPING_BASE
 
 const getPage = async (day) => {
+    console.log(`get ${baseURL + day}`)
     const { data } = await axios.get(baseURL + day)
     return data
 }
@@ -24,80 +26,83 @@ const getSynopsis = async (link) => {
 
 
 const parsePage = async (data) => {
-    const schedules = []
+    const channelsSchedules = []
 
     const $ = cheerio.load(data)
     const canals = $('div.bouquet-epgGrid').find('div.doubleBroadcastCard').toArray()
-    console.log(canals.length)
-
+    console.log(`canal trouvé ${canals.length}`)
      await Promise.all(canals.map( async (canal) => {
-        const heure = $(canal).find('.doubleBroadcastCard-hour')
-        const nom =  $(canal).find('.doubleBroadcastCard-title')
+        const hour = $(canal).find('.doubleBroadcastCard-hour')
+        const title =  $(canal).find('.doubleBroadcastCard-title')
         const channel = $(canal).find('.doubleBroadcastCard-channelName')
         const type = $(canal).find('.doubleBroadcastCard-type')
         const duration = $(canal).find('span.doubleBroadcastCard-durationContent')
         const descriptions = [
-            await getSynopsis($(nom[0]).attr('href').trim()),
-            await getSynopsis($(nom[1]).attr('href').trim())
+            await getSynopsis($(title[0]).attr('href').trim()),
+            await getSynopsis($(title[1]).attr('href').trim())
         ]
-        const schedule = {
+        const channelInformation = {
             channel: $(channel).text().trim(),
-            channelSchedule: []
+            channelSchedules: []
         }
 
         for(let i = 0; i < 2; i++) {
-            schedule.channelSchedule.push({
-                hour: $(heure[i]).text().trim(),
-                programme: $(nom[i]).text().trim(),
+            channelInformation.channelSchedules.push({
+                hour: $(hour[i]).text().trim(),
+                programme: $(title[i]).text().trim(),
                 description: descriptions[i],
                 type: $(type[i]).text().trim(),
                 duration: $(duration[i]).text().trim()
             })
         }
-        schedules.push(schedule)
+        channelsSchedules.push(channelInformation)
 
 
 
     }))
-    return schedules
+    return channelsSchedules
 }
 
 
-const persistInDb = async (channel, day) => {
+const persistInDb = async (channelInformation, day) => {
     const newSchedule = {
         day: new Date(day),
-        schedule: channel.channelSchedule
+        schedule: channelInformation.channelSchedules
     }
 
-    const foundedChannel = await dbChannels.findOne({channel: channel.channel})
+    const foundedChannel = await dbChannels.findOne({channel: channelInformation.channel})
     if(foundedChannel) {
-        console.log(`chaine ${channel.channel} Trouvé`)
+        console.log(`chaine ${channelInformation.channel} Trouvé`)
         if(!foundedChannel.schedules.find( schedule => new Date(schedule.day).toDateString() === new Date(day).toDateString())){
-            console.log(`chaine ${channel.channel}, jour ${day} n'existe pas`)
+            console.log(`chaine ${channelInformation.channel}, jour ${day} n'existe pas`)
             foundedChannel.schedules.push(newSchedule)
             dbChannels.update({_id: foundedChannel._id}, {$set: {schedules: foundedChannel.schedules}})
         }
     } else {
-        console.log(`chaine ${channel.channel} non trouvé`)
+        console.log(`chaine ${channelInformation.channel} non trouvé`)
         dbChannels.insert({
-            channel: channel.channel,
+            channel: channelInformation.channel,
             schedules: [
                 newSchedule
             ]
         })
     }
-    console.log(`chaine ${channel.channel} writted`)
+    console.log(`chaine ${channelInformation.channel} writted`)
     return null
 }
 
 const getProg = async (day) => {
     const data = await getPage(day)
     if(data) {
-        const channels = await parsePage(data)
-        console.log('nombre de chaines : ', channels.length)
-        await Promise.all(channels.map(async (channel) => await persistInDb(channel, day)))
+        const channelsSchedules = await parsePage(data)
+        await Promise.all(channelsSchedules.map(async (channelInformation) => await persistInDb(channelInformation, day)))
     }
-    db.close()
+    
 }
+
+(async () => {
+    await getProg('2020-09-01')
+    db.close()
+})()
 
 module.exports = { getProg }

@@ -16,8 +16,8 @@ const getSynopsis = async (link) => {
     try {
         const { data } = await axios.get(link)
         const $ = cheerio.load(data)
-        const description = $('div.synopsis-text.defaultStyleContentTags').text().trim()
-        return description || 'n/a'
+        const description = $('div.synopsis-text.defaultStyleContentTags').text() ? $('div.synopsis-text.defaultStyleContentTags').text().trim() : 'n/a'
+        return description
     } catch (e) {
         return 'n/a'
     }
@@ -37,16 +37,21 @@ const parsePage = async (data) => {
         const channel = $(canal).find('.doubleBroadcastCard-channelName')
         const type = $(canal).find('.doubleBroadcastCard-type')
         const duration = $(canal).find('span.doubleBroadcastCard-durationContent')
-        const descriptions = [
-            await getSynopsis($(title[0]).attr('href').trim()),
-            await getSynopsis($(title[1]).attr('href').trim())
-        ]
+        const descriptions = []
         const channelInformation = {
             channel: $(channel).text().trim(),
             channelSchedules: []
         }
 
         for(let i = 0; i < 2; i++) {
+
+            if($(title[i]).attr('href')) {
+                descriptions.push(await getSynopsis($(title[i]).attr('href').trim()),)
+            } else {
+                descriptions.push('n/a')
+            }
+            
+
             channelInformation.channelSchedules.push({
                 hour: $(hour[i]).text().trim(),
                 programme: $(title[i]).text().trim(),
@@ -101,8 +106,7 @@ const getProg = async (day) => {
 }
 
 (async () => {
-    await getProg('2020-09-01')
-    db.close()
+    await getProg('2020-09-04')
 })()
 
 module.exports = { getProg }

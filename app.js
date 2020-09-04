@@ -11,9 +11,9 @@ const {
 
 
 
-(async () => {
-    console.log(JSON.stringify( await dbChannels.find({ channel: 'TF1' }, { fields: {schedules: {schedule: {hour: 1, programme: 1}, day: 1}} })))
-})()
+// (async () => {
+//     console.log(JSON.stringify( await dbChannels.find({ channel: 'TF1' }, { fields: {schedules: {schedule: {hour: 1, programme: 1}, day: 1}} })))
+// })()
 
 
 
@@ -50,7 +50,20 @@ const resolvers = {
   Date: GraphQLDate,
   Query: {
     channelList: async (_, {}) => await dbChannels.find({}, {channel: 1}),
-    schedulesForChannel: async(_, { channel, day }) => await dbChannels.find({ channel, "schedules.day": new Date(day) }, { fields: {schedules: {schedule: {hour: 1, programme: 1, description: 1, type: 1, duration: 1}, day: 1}}})
+    schedulesForChannel: async(_, { channel, day }) => {
+      let req = { channel }
+      let projection = {}
+
+      if(day) {
+        req['schedules.day'] = new Date(day)
+        projection = { fields: {schedules: {$elemMatch: {day: new Date(day)} }}}
+      }
+
+      return await dbChannels.find(
+          req, 
+          projection
+        )
+    }
   },
  
 }
